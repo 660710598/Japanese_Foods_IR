@@ -47,19 +47,19 @@ def search_recipes(query, top_n=5):
     similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_indices = similarity_scores.argsort()[-top_n:][::-1]
     
-    results = []
+    # สร้างลิสต์สำหรับเก็บผลลัพธ์ที่มีคะแนนความคล้ายคลึงมากกว่า 0 เท่านั้น 
     for idx in top_indices:
         score = similarity_scores[idx]
         # กรองเอาเฉพาะอันที่คะแนนมากกว่า 0 
         if score > 0:
             results.append({
-                'Index': idx,
+                'Index': idx,#เก็บดัชนีของเอกสารที่ถูกดึงมาแสดงผลลัพธ์ เพื่อใช้ในการคำนวณ Precision และ Recall ในภายหลัง
                 'Title': df.iloc[idx]['Recipe Title'],
                 'Score': round(score * 100, 2), # แปลงเป็นเปอร์เซ็นต์ให้ดูง่าย
                 'URL': df.iloc[idx]['Recipe URL']
             })
-            
     return results
+
 #สร้างตัวแปร List สำหรับเก็บ "ประวัติ" การประเมินผลของทุกคำค้นหา
 session_history = []
 while True:
@@ -74,7 +74,8 @@ while True:
     if not user_query.strip():
         print("Please enter a valid search query. ")
         continue
-    
+
+    # ค้นหาข้อมูล
     K=5
     search_results = search_recipes(user_query, top_n=K)
 
@@ -91,7 +92,7 @@ while True:
             df['Cleaned Ingredients'].str.contains(user_query, case=False, na=False)
         ].index.tolist()
             
-        # ดัชนีของเอกสารที่ถูกดึงมาแสดงผลลัพธ์
+        # ดึงดัชนีของเอกสารที่ถูกดึงมาแสดงผลลัพธ์ เพื่อใช้ในการคำนวณ Precision และ Recall ในภายหลัง
         retrieved_indices = [res['Index'] for res in search_results]
 
         p_score = precision_at_k(retrieved_indices, relevant_docs, K)
