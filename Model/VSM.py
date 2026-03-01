@@ -42,12 +42,26 @@ df['Search_Text'] = (df['Recipe Title'].astype(str) + " ") * 3 + df['Cleaned Ing
 # สร้างเมทริกซ์ TF-IDF จากคอลัมน์ 'Search_Text' ซึ่งจะใช้ในการคำนวณความคล้ายคลึงระหว่างคำค้นหาของผู้ใช้กับข้อมูลในฐานข้อมูล
 tfidf_matrix = vectorizer.fit_transform(df['Search_Text'])
 
-def search_recipes(query, top_n=5):
+# สร้าง Inverted Index จากเมทริกซ์ TF-IDF เพื่อให้สามารถดูได้ว่าแต่ละคำมีอยู่ในเอกสารไหนบ้าง และมี Document Frequency (DF) เท่าไหร่
+feature_names = vectorizer.get_feature_names_out()
+inverted_index = {}
+
+for col_idx, term in enumerate(feature_names):
+    doc_indices = tfidf_matrix[:, col_idx].nonzero()[0]
+    postings_list = [f"Doc{doc_id}" for doc_id in doc_indices]
+    inverted_index[term] = {
+        'DF': len(doc_indices),
+        'Postings': postings_list
+    }
+
+K=5
+def search_recipes(query, top_n=K):
     query_vec = vectorizer.transform([query])
     similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_indices = similarity_scores.argsort()[-top_n:][::-1]
     
-    # สร้างลิสต์สำหรับเก็บผลลัพธ์ที่มีคะแนนความคล้ายคลึงมากกว่า 0 เท่านั้น 
+    # สร้างลิสต์สำหรับเก็บผลลัพธ์ที่มีคะแนนความคล้ายคลึงมากกว่า 0 เท่านั้น
+    results = []
     for idx in top_indices:
         score = similarity_scores[idx]
         # กรองเอาเฉพาะอันที่คะแนนมากกว่า 0 
@@ -75,8 +89,28 @@ while True:
         print("Please enter a valid search query. ")
         continue
 
+    # แสดง Inverted Index สำหรับคำค้นหาของผู้ใช้ เพื่อให้เห็นว่าคำค้นหานั้นมีอยู่ในฐานข้อมูลหรือไม่ และมีเอกสารไหนบ้างที่พบคำนี้
+    query_terms = user_query.lower().split() # หั่นคำค้นหาแยกเป็นคำๆ
+    print("\n" + "-"*60)
+    print(f"📖 [Behind the Scenes] Inverted Index สำหรับคำค้นหา: '{user_query}'")
+    print("-" * 60)
+    print(f"{'Term':<15} | {'DF':<5} | {'Postings List (เอกสารที่พบคำนี้)'}")
+    print("-" * 60)
+    
+    for term in query_terms:
+        if term in inverted_index:
+            df_count = inverted_index[term]['DF']
+            # โชว์แค่ 10 เอกสารแรก ถ้าเกินให้ใส่ ... ต่อท้าย
+            postings = inverted_index[term]['Postings'][:10] 
+            postings_str = ", ".join(postings)
+            if df_count > 10:
+                postings_str += ", ..."
+            print(f"{term:<15} | {df_count:<5} | [{postings_str}]")
+        else:
+            print(f"{term:<15} | 0     | [ไม่พบคำนี้ในฐานข้อมูล]")
+    print("-" * 60)
+
     # ค้นหาข้อมูล
-    K=5
     search_results = search_recipes(user_query, top_n=K)
 
     # แสดงผลลัพธ์
@@ -107,11 +141,16 @@ while True:
             'ap': ap_score
         })
         print("\n" + "="*60)
-        print(f"     Precision@{K}: {p_score:.2f} | Recall@{K}: {r_score:.2f} | Average Precision: {ap_score:.2f}")
-        print("\n" + "="*60)
+        print(f"Precision_{K}: {p_score:.2f} | Recall_{K}: {r_score:.2f} | Average Precision: {ap_score:.2f}")
+        print("" + "="*60)
+        print("\n")
         ap_list = []
         # วนลูปปริ้นท์ประวัติการค้นหาทั้งหมดที่เคยค้นมา
+
+        print("menu            | precision    | recall     | average precision")
+        print("-" * 60)
         for history in session_history:
+           
             print(f"{history['query']:<15} | {history['p']:<12.2f} | {history['r']:<10.2f} | {history['ap']:.2f}")
             ap_list.append(history['ap'])
         print("-" * 60)
@@ -120,4 +159,4 @@ while True:
     else:
         print(f"\n  No results found for '{user_query}' ")
         
-    print("-" * 50)
+    print("-" * 60)
