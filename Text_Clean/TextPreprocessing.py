@@ -28,7 +28,8 @@ custom_culinary_stopwords = {
     'chopped', 'minced', 'sliced', 'diced', 'peeled', 'grated', 'fresh', 'dried',
     'to', 'taste', 'optional', 'divided', 'large', 'small', 'medium', 'whole', 'half',
     'serving', 'minute', 'min', 'tb', 'lb', 'pound', 
-    'people', 'package', 'packet', 'bag', 'substitute'
+    'people', 'package', 'packet', 'bag', 'substitute', 'gr', 'pack', 
+    'cut', 'chunk', 'piece', 'sliced'
 }
 
 all_stopwords = stopwords.union(custom_culinary_stopwords)
