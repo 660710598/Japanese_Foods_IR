@@ -12,7 +12,7 @@ amount = 50
 count = 0 
 page = 1 
 
-print ("กำลังดึงข้อมูลลิงก์สูตรอาหารจากเว็บไซต์ Cookpad...")
+print("Fetching recipe links from Cookpad website...")
 
 while count < amount:
     current_url = f"{search_base_url}?page={page}"
