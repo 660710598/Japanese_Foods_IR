@@ -36,6 +36,7 @@ except FileNotFoundError:
     print(f"{filename} not found.")
     exit()
 
+
 # Build TF-IDF Matrix
 vectorizer = TfidfVectorizer()
 # Combine 'Cleaned Title' and 'Cleaned Ingredients' for better search relevance
@@ -90,7 +91,6 @@ for i in range(true_k):
     top_words = [terms[ind] for ind in order_centroids[i, :7]]
     print(f"   🍲 Cluster {i+1}: {', '.join(top_words)}")
 print("="*60)
-
 
 session_history = []
 # Interactive Search Loop
