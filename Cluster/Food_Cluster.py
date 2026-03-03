@@ -10,24 +10,24 @@ try:
     df = pd.read_csv(filename, encoding='utf-8-sig')
     df['Cleaned Ingredients'] = df['Cleaned Ingredients'].fillna('')
 except FileNotFoundError:
-    print(f"❌ ไม่พบไฟล์ {filename} กรุณาตรวจสอบชื่อไฟล์อีกครั้ง")
+    print("cannot find file:", filename)
     exit()
 
 print("TF-IDF Matrix...")
 vectorizer = TfidfVectorizer()
-df['Search_Text'] = (df['Recipe Title'].astype(str) + " ") * 3 + df['Cleaned Ingredients'].astype(str)
+df['Search_Text'] = (df['Cleaned Title'].astype(str) + " ") * 3 + df['Cleaned Ingredients'].astype(str)
 tfidf_matrix = vectorizer.fit_transform(df['Search_Text'])
 
 
 true_k = 6
-print(f"🤖 กำลังจัดกลุ่มเมนูอาหารเป็น {true_k} กลุ่ม ด้วย K-Means...")
+print(f"Performing K-Means Clustering with K={true_k}...")
 kmeans_model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=1, random_state=0)
 kmeans_model.fit(tfidf_matrix)
 
 df['Cluster'] = kmeans_model.labels_
 
 print("\n" + "="*60)
-print("✅ ผลลัพธ์การจัดกลุ่ม (คำศัพท์ที่เป็นตัวแทนของแต่ละหมวดหมู่):")
+print("Clustering Results:")
 print("="*60)
 
 order_centroids = kmeans_model.cluster_centers_.argsort()[:, ::-1]
@@ -38,7 +38,7 @@ for i in range(true_k):
     print(f"🍲 Cluster {i}: {', '.join(top_words)}")
 print("="*60)
 
-print("\n🎨 กำลังวาดกราฟ Scatter Plot เพื่อดูการกระจายตัวของข้อมูล...")
+print("Visualizing Clusters with PCA...")
 pca = PCA(n_components=2, random_state=0)
 reduced_features = pca.fit_transform(tfidf_matrix.toarray())
 centroids_2d = pca.transform(kmeans_model.cluster_centers_)
@@ -78,5 +78,5 @@ plt.ylabel('PCA Component 2', fontsize=12)
 plt.legend(title='Cluster & Centroid', bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
 
-print("✅ วาดกราฟเสร็จสมบูรณ์! (หน้าต่างรูปภาพกำลังแสดงขึ้นมา)")
+print("Displaying the cluster visualization...")
 plt.show()
