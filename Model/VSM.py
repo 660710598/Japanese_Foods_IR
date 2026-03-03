@@ -36,20 +36,18 @@ except FileNotFoundError:
     print(f"{filename} not found.")
     exit()
 
-# สร้างตัวแปร vectorizer สำหรับแปลงข้อความเป็นเมทริกซ์ TF-IDF 
+
+# Build TF-IDF Matrix
 vectorizer = TfidfVectorizer()
-
-# สร้างคอลัมน์ 'Search_Text' โดยรวมชื่อเมนูและส่วนผสมเข้าด้วยกัน ชื่อเมนูถูกคูณด้วย 3 เพื่อเพิ่มน้ำหนักให้กับชื่อเมนูในการคำนวณความคล้ายคลึง 
-df['Search_Text'] = (df['Recipe Title'].astype(str) + " ") * 3 + df['Cleaned Ingredients'].astype(str)
-
-# สร้างเมทริกซ์ TF-IDF จากคอลัมน์ 'Search_Text' ซึ่งจะใช้ในการคำนวณความคล้ายคลึงระหว่างคำค้นหาของผู้ใช้กับข้อมูลในฐานข้อมูล
+# Combine 'Cleaned Title' and 'Cleaned Ingredients' for better search relevance
+df['Search_Text'] = (df['Cleaned Title'].astype(str) + " ") * 3 + df['Cleaned Ingredients'].astype(str)
+# Create TF-IDF matrix
 tfidf_matrix = vectorizer.fit_transform(df['Search_Text'])
-
-# สร้าง Inverted Index จากเมทริกซ์ TF-IDF เพื่อให้สามารถดูได้ว่าแต่ละคำมีอยู่ในเอกสารไหนบ้าง และมี Document Frequency (DF) เท่าไหร่
+# Build Inverted Index
 feature_names = vectorizer.get_feature_names_out()
 inverted_index = {}
 
-# วนลูปผ่านแต่ละคำใน feature_names และสร้าง Inverted Index (รายชื่อเอกสารที่มีคำนั้น)
+# Build Inverted Index
 for col_idx, term in enumerate(feature_names):
     doc_indices = tfidf_matrix[:, col_idx].nonzero()[0]
     postings_list = [f"Doc{doc_id}" for doc_id in doc_indices]
@@ -58,38 +56,33 @@ for col_idx, term in enumerate(feature_names):
         'Postings': postings_list
     }
 
-K=5
-# ฟังก์ชันสำหรับค้นหาเมนูอาหารที่คล้ายกับคำค้นหาของผู้ใช้ โดยใช้ความคล้ายคลึงของเวกเตอร์ TF-IDF และคำนวณคะแนนความคล้ายคลึงด้วย cosine similarity
-def search_recipes(query, top_n=K):
+N=5
+#Search Function
+def search_recipes(query, top_n=N):
     query_vec = vectorizer.transform([query])
     similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_indices = similarity_scores.argsort()[-top_n:][::-1]
     
-    # สร้างลิสต์สำหรับเก็บผลลัพธ์ที่มีคะแนนความคล้ายคลึงมากกว่า 0 เท่านั้น
     results = []
     for idx in top_indices:
         score = similarity_scores[idx]
-        # กรองเอาเฉพาะอันที่คะแนนมากกว่า 0 
         if score > 0:
             results.append({
-                'Index': idx,#เก็บดัชนีของเอกสารที่ถูกดึงมาแสดงผลลัพธ์ เพื่อใช้ในการคำนวณ Precision และ Recall ในภายหลัง
+                'Index': idx,
                 'Title': df.iloc[idx]['Recipe Title'],
-                'Score': round(score * 100, 2), # แปลงเป็นเปอร์เซ็นต์ให้ดูง่าย
+                'Score': round(score * 100, 2),
                 'URL': df.iloc[idx]['Recipe URL'],
-                'Cluster': df.iloc[idx]['Cluster_ID']+1 # ดึงเลขกลุ่มมาแสดงด้วย 
+                'Cluster': df.iloc[idx]['Cluster_ID']+1 
             })
     return results
 
-# K-Means Clustering
-print("\n" + "="*60)
 print("Grouping menu items with K-Means Clustering")
-
 true_k = 6 
+#K-Means Clustering
 kmeans_model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=1, random_state=0)
 kmeans_model.fit(tfidf_matrix)
 df['Cluster_ID'] = kmeans_model.labels_
 
-# แสดงคำศัพท์ที่เด่นที่สุดในแต่ละกลุ่ม เพื่อให้เห็นว่าระบบเรียนรู้หมวดหมู่อาหารอะไรได้บ้างจากข้อมูลที่มี
 order_centroids = kmeans_model.cluster_centers_.argsort()[:, ::-1]
 terms = vectorizer.get_feature_names_out()
 
@@ -99,8 +92,8 @@ for i in range(true_k):
     print(f"   🍲 Cluster {i+1}: {', '.join(top_words)}")
 print("="*60)
 
-#สร้างตัวแปร List สำหรับเก็บ "ประวัติ" การประเมินผลของทุกคำค้นหา
 session_history = []
+# Interactive Search Loop
 while True:
     print("Welcome to Japanese Foods🍣")
     print("(type 'q' or 'exit' to quit)")
@@ -114,17 +107,16 @@ while True:
         print("Please enter a valid search query. ")
         continue
 
-    # แสดง Inverted Index สำหรับคำค้นหาของผู้ใช้ เพื่อให้เห็นว่าคำค้นหานั้นมีอยู่ในฐานข้อมูลหรือไม่ และมีเอกสารไหนบ้างที่พบคำนี้
-    query_terms = user_query.lower().split() # หั่นคำค้นหาแยกเป็นคำๆ
+    query_terms = user_query.lower().split() 
     print("\n" + "-"*60)
     print(f" Inverted Index : '{user_query}'")
     print("-" * 60)
     print(f"{'Term':<15} | {'DF':<5} | {'Postings List '}")
     print("-" * 60)
+    # Display DF and Postings List for each term in the query
     for term in query_terms:
         if term in inverted_index:
             df_count = inverted_index[term]['DF']
-            # โชว์แค่ 10 เอกสารแรก ถ้าเกินให้ใส่ ... ต่อท้าย
             postings = inverted_index[term]['Postings'][:10] 
             postings_str = ", ".join(postings)
             if df_count > 10:
@@ -134,42 +126,36 @@ while True:
             print(f"{term:<15} | 0     | [Not Found]")
     print("-" * 60)
 
-    # ค้นหาข้อมูล
-    search_results = search_recipes(user_query, top_n=K)
-
-    # แสดงผลลัพธ์
+    # Perform search and evaluate results
+    search_results = search_recipes(user_query, top_n=N)
     if search_results:
         print(f"\n  find {len(search_results)} Menu that matches '{user_query}' ")
         for i, result in enumerate(search_results):
             print(f"[{i+1}] {result['Title']}")
             print(f"     Similarity: {result['Score']}% | Category: Cluster {result['Cluster']} | URL: {result['URL']}")
             
-            # คำนวณเอกสารที่เกี่ยวข้องโดยการตรวจสอบว่าชื่อเมนูหรือส่วนผสมที่ทำความสะอาดแล้วมีคำค้นหาของผู้ใช้หรือไม่
         relevant_docs = df[
             df['Recipe Title'].str.contains(user_query, case=False, na=False) | 
             df['Cleaned Ingredients'].str.contains(user_query, case=False, na=False)
         ].index.tolist()
             
-        # ดึงดัชนีของเอกสารที่ถูกดึงมาแสดงผลลัพธ์ เพื่อใช้ในการคำนวณ Precision และ Recall ในภายหลัง
         retrieved_indices = [res['Index'] for res in search_results]
-
-        p_score = precision_at_k(retrieved_indices, relevant_docs, K)
-        r_score = recall_at_k(retrieved_indices, relevant_docs, K)
+        p_score = precision_at_k(retrieved_indices, relevant_docs, N)
+        r_score = recall_at_k(retrieved_indices, relevant_docs, N)
         ap_score = average_precision(retrieved_indices, relevant_docs)
 
-        # เก็บผลลัพธ์ของคำค้นหานี้เข้าประวัติรวม
         session_history.append({
             'query': user_query,
             'p': p_score,
             'r': r_score,
             'ap': ap_score
         })
+
         print("\n" + "="*60)
-        print(f"Precision_{K}: {p_score:.2f} | Recall_{K}: {r_score:.2f} | Average Precision: {ap_score:.2f}")
+        print(f"Precision_{N}: {p_score:.2f} | Recall_{N}: {r_score:.2f} | Average Precision: {ap_score:.2f}")
         print("" + "="*60)
         print("\n")
         ap_list = []
-        # วนลูปปริ้นท์ประวัติการค้นหาทั้งหมดที่เคยค้นมา
         print("menu            | precision    | recall     | average precision")
         print("-" * 60)
         for history in session_history:
