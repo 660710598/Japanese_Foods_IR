@@ -55,10 +55,51 @@ for col_idx, term in enumerate(feature_names):
         'Postings': postings_list
     }
 
-N=5
+# Define synonyms for query expansion
+synonyms_dict = {
+    'meat': ['pork', 'beef', 'chicken', 'meatball', 'belly', 'thigh', 'breast', 'wing'],
+    'pork': ['bacon', 'belly', 'ham', 'shoulder', 'tonkatsu'],
+    'beef': ['steak', 'lean', 'cow'],
+    'chicken': ['poultry', 'thigh', 'breast', 'wing', 'karaage'],
+    'fish': ['salmon', 'tuna', 'cod', 'bonito', 'filet'],
+    'seafood': ['fish', 'shrimp', 'salmon', 'tuna', 'crab', 'squid'],
+    'seaweed': ['nori', 'kombu', 'kelp', 'wakame'],
+    'noodle': ['ramen', 'udon', 'soba', 'pasta', 'macaroni', 'spaghetti'],
+    'rice': ['grain', 'bowl', 'donburi', 'sushi'],
+    'bread': ['bun', 'loaf', 'sando', 'sandwich', 'dough', 'pizza', 'breadcrumb'],
+    'veg': ['vegetable', 'carrot', 'cabbage', 'onion', 'garlic', 'potato', 'tomato', 'cucumber', 'broccoli', 'eggplant', 'spinach', 'zucchini'],
+    'vegetable': ['carrot', 'cabbage', 'onion', 'garlic', 'potato', 'tomato', 'cucumber', 'broccoli', 'eggplant', 'spinach', 'zucchini'],
+    'mushroom': ['shiitake', 'fungus', 'shimeji', 'enoki'],
+    'onion': ['scallion', 'shallot', 'leek', 'chive'],
+    'sauce': ['soy', 'mayo', 'mayonnaise', 'ketchup', 'mustard', 'worcestershire', 'teriyaki', 'dressing'],
+    'soup': ['broth', 'stock', 'dashi', 'bouillon', 'miso'],
+    'oil': ['fat', 'olive', 'sesame', 'frying'],
+    'spicy': ['chili', 'pepper', 'curry', 'hot', 'wasabi', 'gochujang'],
+    'sweet': ['sugar', 'honey', 'syrup', 'dessert', 'mirin', 'sweetener'],
+    'herb': ['parsley', 'basil', 'cilantro', 'shiso', 'mint'],
+    'spice': ['cumin', 'paprika', 'pepper', 'ginger'],
+    'dairy': ['milk', 'butter', 'cheese', 'mozzarella', 'cream', 'cottage']
+}
+
+# Function to expand query using synonyms
+def expand_query(query):
+    expanded_terms = []
+    for word in query.lower().split():
+        expanded_terms.append(word) 
+        
+        if word in synonyms_dict:
+            expanded_terms.extend(synonyms_dict[word])
+    
+    return " ".join(expanded_terms)
+
+N=15
 #Search Function
-def search_recipes(query, top_n=N):
-    query_vec = vectorizer.transform([query])
+def search_recipes(original_query, top_n=N):
+    expanded_q = expand_query(original_query)
+    if expanded_q != original_query.lower():
+        print(f"\n   [Query Expansion] : '{expanded_q}'")
+
+    query_vec = vectorizer.transform([expanded_q])
     similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_indices = similarity_scores.argsort()[-top_n:][::-1]
     
@@ -90,7 +131,6 @@ for i in range(true_k):
     top_words = [terms[ind] for ind in order_centroids[i, :7]]
     print(f"   🍲 Cluster {i+1}: {', '.join(top_words)}")
 print("="*60)
-
 
 session_history = []
 # Interactive Search Loop
@@ -133,10 +173,13 @@ while True:
         for i, result in enumerate(search_results):
             print(f"[{i+1}] {result['Title']}")
             print(f"     Similarity: {result['Score']}% | Category: Cluster {result['Cluster']} | URL: {result['URL']}")
-            
+
+        expanded_eval_query = expand_query(user_query)
+        eval_pattern = '|'.join(expanded_eval_query.split())
+
         relevant_docs = df[
-            df['Recipe Title'].str.contains(user_query, case=False, na=False) | 
-            df['Cleaned Ingredients'].str.contains(user_query, case=False, na=False)
+            df['Cleaned Title'].str.contains(eval_pattern, case=False, na=False) | 
+            df['Cleaned Ingredients'].str.contains(eval_pattern, case=False, na=False)
         ].index.tolist()
             
         retrieved_indices = [res['Index'] for res in search_results]
