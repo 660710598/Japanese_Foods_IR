@@ -167,7 +167,7 @@ while True:
         print(f"   Clean query : '{clean_query}'")
 
     print("\n" + "-"*60)
-    print(f" Inverted Index : '{user_query}'")
+    print(f" Inverted Index : '{clean_query}'")
     print("-" * 60)
     print(f"{'Term':<15} | {'DF':<5} | {'Postings List '}")
     print("-" * 60)
@@ -235,7 +235,7 @@ while True:
                 hits += 1
                 p_at_rank = hits / rank # คำนวณ Precision ณ อันดับนั้น
                 sum_precisions += p_at_rank
-                print(f"   Rank {rank}: Match! (Found {hits} items) -> P@{rank} = {hits}/{rank} = {p_at_rank:.2f}")
+                print(f"   Rank {rank}: Match! (Found {hits} items) -> P_{rank} = {hits}/{rank} = {p_at_rank:.2f}")
             else:
                 print(f"   Rank {rank}: No match")
         

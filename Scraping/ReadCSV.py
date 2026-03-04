@@ -1,17 +1,15 @@
 import csv
 import requests
-from bs4 import BeautifulSoup
-import time
 import re
+import time
+from bs4 import BeautifulSoup
+
 
 input_filename = 'Japan_Food_Links_50.csv' 
 output_filename = 'Japan_Food_Ingredients_Full.csv'
 
 full_recipe_data = [["Recipe Title", "Recipe URL", "Ingredients"]]
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
 
 print("Loading recipe links from CSV file...")
 
@@ -20,8 +18,8 @@ print("Loading recipe links from CSV file...")
 try:
     with open(input_filename, 'r', encoding='utf-8-sig') as f:
         reader = csv.reader(f)
-        header = next(reader) # ข้ามบรรทัด Header (Recipe Title, Recipe URL)
-        recipes_to_scrape = list(reader) # เก็บข้อมูลที่เหลือลง List
+        header = next(reader) 
+        recipes_to_scrape = list(reader) 
 except FileNotFoundError:
     print(f"{input_filename} not found.")
     exit()
@@ -40,7 +38,7 @@ for index, row in enumerate(recipes_to_scrape):
         continue
 
     try:
-        res = requests.get(url, headers=headers, timeout=10) # ใส่ timeout กันเว็บค้าง
+        res = requests.get(url, timeout=10) 
         res.encoding = "utf-8"
         soup = BeautifulSoup(res.text, 'html.parser')
         
@@ -51,7 +49,6 @@ for index, row in enumerate(recipes_to_scrape):
         for tag in ingredient_tags:
             # ดึงข้อความจากแท็ก และทำความสะอาดข้อมูลด้วย regex เพื่อเอาเฉพาะตัวอักษรและตัวเลข (รวมถึงเครื่องหมายที่จำเป็น)
             text = tag.get_text(separator=' ', strip=True)
-            text = re.sub(r'[^\w\sก-๙/.,-]', '', text) 
             
             if text and len(text) > 1 and text not in ingredients_list:
                 ingredients_list.append(text)

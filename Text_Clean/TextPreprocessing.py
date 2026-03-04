@@ -46,7 +46,7 @@ all_stopwords = stopwords.union(custom_culinary_stopwords)
 def clean_title(text):
     text = str(text).lower()
     text = re.sub(r'[^a-z\s]', ' ', text) # เก็บไว้แค่ตัวอักษรภาษาอังกฤษ
-    tokens = word_tokenize(text)
+    tokens = word_tokenize(text) # แปลงข้อความเป็น tokens 
     
     cleaned_tokens = []
     for token in tokens:
