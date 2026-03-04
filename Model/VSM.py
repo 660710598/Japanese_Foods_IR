@@ -1,8 +1,14 @@
 import pandas as pd
 import numpy as np
+import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import KMeans
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words('english'))
 
 # Evaluation Metrics
 def precision_at_k(retrieved, relevant, k):
@@ -107,13 +113,13 @@ def search_recipes(original_query, top_n=N):
     results = []
     for idx in top_indices:
         score = similarity_scores[idx]
-        if score > 0:
-            results.append({
-                'Index': idx,
-                'Title': df.iloc[idx]['Recipe Title'],
-                'Score': round(score * 100, 2),
-                'URL': df.iloc[idx]['Recipe URL'],
-                'Cluster': df.iloc[idx]['Cluster_ID']+1 
+        
+        results.append({
+            'Index': idx,
+            'Title': df.iloc[idx]['Recipe Title'],
+            'Score': score,
+            'URL': df.iloc[idx]['Recipe URL'],
+            'Cluster': df.iloc[idx]['Cluster_ID']+1 
             })
     return results
 
@@ -123,10 +129,8 @@ true_k = 6
 kmeans_model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=1, random_state=0)
 kmeans_model.fit(tfidf_matrix)
 df['Cluster_ID'] = kmeans_model.labels_
-
 order_centroids = kmeans_model.cluster_centers_.argsort()[:, ::-1]
 terms = vectorizer.get_feature_names_out()
-
 print(" Top terms per cluster:")
 for i in range(true_k):
     top_words = [terms[ind] for ind in order_centroids[i, :7]]
@@ -148,13 +152,28 @@ while True:
         print("Please enter a valid search query. ")
         continue
 
-    query_terms = user_query.lower().split() 
+    clean_text = re.sub(r'[^a-z\s]', ' ', user_query.lower())
+    clean_query_words = []
+    for w in clean_text.split():
+        if w not in stop_words:
+            clean_query_words.append(lemmatizer.lemmatize(w))
+
+    clean_query = " ".join(clean_query_words)
+    
+    if not clean_query.strip():
+        print("   Please enter a valid food ingredient or recipe name.")
+        continue
+
+    if clean_query != user_query.lower():
+        print(f"   Clean query : '{clean_query}'")
+
     print("\n" + "-"*60)
     print(f" Inverted Index : '{user_query}'")
     print("-" * 60)
     print(f"{'Term':<15} | {'DF':<5} | {'Postings List '}")
     print("-" * 60)
     # Display DF and Postings List for each term in the query
+    query_terms = clean_query.split()
     for term in query_terms:
         if term in inverted_index:
             df_count = inverted_index[term]['DF']
@@ -168,15 +187,15 @@ while True:
     print("-" * 60)
 
     # Perform search and evaluate results
-    search_results = search_recipes(user_query, top_n=N)
+    search_results = search_recipes(clean_query, top_n=N)
     if search_results:
         print(f"\n  find {len(search_results)} Menu that matches '{user_query}' ")
         for i, result in enumerate(search_results):
             print(f"[{i+1}] {result['Title']}")
-            print(f"     Similarity: {result['Score']}% | Category: Cluster {result['Cluster']} | URL: {result['URL']}")
+            print(f"     Similarity: {result['Score']:.4f} | Category: Cluster {result['Cluster']} | URL: {result['URL']}")
 
-        expanded_eval_query = expand_query(user_query)
-        eval_pattern = '|'.join(expanded_eval_query.split())
+        expanded_eval_query = expand_query(clean_query)
+        eval_pattern = r'\b(?:' + '|'.join(expanded_eval_query.split()) + r')\b'
 
         relevant_docs = df[
             df['Cleaned Title'].str.contains(eval_pattern, case=False, na=False) | 
@@ -184,6 +203,19 @@ while True:
         ].index.tolist()
             
         retrieved_indices = [res['Index'] for res in search_results]
+        retrieved_k = retrieved_indices[:N] 
+        relevant_set = set(relevant_docs)   
+        
+        # True Positive (TP)
+        tp_set = set(retrieved_k).intersection(relevant_set)
+        TP = len(tp_set)
+        
+        # False Positive (FP)
+        FP = len(retrieved_k) - TP
+        
+        # False Negative (FN)
+        FN = len(relevant_set) - TP
+
         p_score = precision_at_k(retrieved_indices, relevant_docs, N)
         r_score = recall_at_k(retrieved_indices, relevant_docs, N)
         ap_score = average_precision(retrieved_indices, relevant_docs)
@@ -195,6 +227,30 @@ while True:
             'ap': ap_score
         })
 
+        hits = 0
+        sum_precisions = 0.0
+        # วนลูปเช็คทีละอันดับ
+        for i, doc_idx in enumerate(retrieved_indices):
+            rank = i + 1
+            if doc_idx in relevant_docs:
+                hits += 1
+                p_at_rank = hits / rank # คำนวณ Precision ณ อันดับนั้น
+                sum_precisions += p_at_rank
+                print(f"   Rank {rank}: Match! (Found {hits} items) -> P@{rank} = {hits}/{rank} = {p_at_rank:.2f}")
+            else:
+                print(f"   Rank {rank}: No match")
+        
+        total_relevant = len(relevant_docs)
+        if total_relevant > 0:
+            print(f"\n   Sum of Precisions (Relevant Documents) = {sum_precisions:.2f}")
+            print(f"   Divided by Total Relevant Documents = {total_relevant} items")
+            print(f"   👉 AP = {sum_precisions:.2f} / {total_relevant} = {ap_score:.2f}")
+        else:
+            print(f"\n AP = 0.00")
+
+        print(f"   [+] True Positive  (TP) : {TP}  ")
+        print(f"   [-] False Positive (FP) : {FP}  ")
+        print(f"   [-] False Negative (FN) : {FN}  ")
         print("\n" + "="*60)
         print(f"Precision_{N}: {p_score:.2f} | Recall_{N}: {r_score:.2f} | Average Precision: {ap_score:.2f}")
         print("" + "="*60)
