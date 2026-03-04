@@ -2,13 +2,13 @@ from bs4 import BeautifulSoup
 import requests
 import csv
 from urllib.parse import urljoin
-import re
+
 
 base_url = "https://cookpad.com"
 search_base_url = "https://cookpad.com/eng/search/japan"
 
 recipe_data = [["Recipe Title", "Recipe URL"]] 
-amount = 50 
+amount = 100 
 count = 0 
 page = 1 
 
@@ -31,7 +31,6 @@ while count < amount:
             break 
             
         title = course.get_text(strip=True)
-        title = re.sub(r'[^\w\sก-๙]', '', title) # ลบอักขระพิเศษที่ไม่ใช่ตัวอักษรและตัวเลข 
         if not title:
             continue
             
