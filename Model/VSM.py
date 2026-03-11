@@ -6,6 +6,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import KMeans
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
+from collections import Counter
 
 lemmatizer = WordNetLemmatizer()
 stop_words = set(stopwords.words('english'))
@@ -45,13 +46,13 @@ except FileNotFoundError:
 # Build TF-IDF Matrix
 vectorizer = TfidfVectorizer()
 # Combine 'Cleaned Title' and 'Cleaned Ingredients' for better search relevance
-df['Search_Text'] = (df['Cleaned Title'].astype(str) + " ") * 3 + df['Cleaned Ingredients'].astype(str)
+df['Search_Text'] = (df['Cleaned Title'].astype(str) + " ") * 6 + df['Cleaned Ingredients'].astype(str)
 # Create TF-IDF matrix
 tfidf_matrix = vectorizer.fit_transform(df['Search_Text'])
 # Build Inverted Index
 feature_names = vectorizer.get_feature_names_out()
-inverted_index = {}
 
+inverted_index = {}
 # Build Inverted Index
 for col_idx, term in enumerate(feature_names):
     doc_indices = tfidf_matrix[:, col_idx].nonzero()[0]
@@ -61,42 +62,32 @@ for col_idx, term in enumerate(feature_names):
         'Postings': postings_list
     }
 
-# Define synonyms for query expansion
-synonyms_dict = {
-    'meat': ['pork', 'beef', 'chicken', 'meatball', 'belly', 'thigh', 'breast', 'wing'],
-    'pork': ['bacon', 'belly', 'ham', 'shoulder', 'tonkatsu'],
-    'beef': ['steak', 'lean', 'cow'],
-    'chicken': ['poultry', 'thigh', 'breast', 'wing', 'karaage'],
-    'fish': ['salmon', 'tuna', 'cod', 'bonito', 'filet'],
-    'seafood': ['fish', 'shrimp', 'salmon', 'tuna', 'crab', 'squid'],
-    'seaweed': ['nori', 'kombu', 'kelp', 'wakame'],
-    'noodle': ['ramen', 'udon', 'soba', 'pasta', 'macaroni', 'spaghetti'],
-    'rice': ['grain', 'bowl', 'donburi', 'sushi'],
-    'bread': ['bun', 'loaf', 'sando', 'sandwich', 'dough', 'pizza', 'breadcrumb'],
-    'veg': ['vegetable', 'carrot', 'cabbage', 'onion', 'garlic', 'potato', 'tomato', 'cucumber', 'broccoli', 'eggplant', 'spinach', 'zucchini'],
-    'vegetable': ['carrot', 'cabbage', 'onion', 'garlic', 'potato', 'tomato', 'cucumber', 'broccoli', 'eggplant', 'spinach', 'zucchini'],
-    'mushroom': ['shiitake', 'fungus', 'shimeji', 'enoki'],
-    'onion': ['scallion', 'shallot', 'leek', 'chive'],
-    'sauce': ['soy', 'mayo', 'mayonnaise', 'ketchup', 'mustard', 'worcestershire', 'teriyaki', 'dressing'],
-    'soup': ['broth', 'stock', 'dashi', 'bouillon', 'miso'],
-    'oil': ['fat', 'olive', 'sesame', 'frying'],
-    'spicy': ['chili', 'pepper', 'curry', 'hot', 'wasabi', 'gochujang'],
-    'sweet': ['sugar', 'honey', 'syrup', 'dessert', 'mirin', 'sweetener'],
-    'herb': ['parsley', 'basil', 'cilantro', 'shiso', 'mint'],
-    'spice': ['cumin', 'paprika', 'pepper', 'ginger'],
-    'dairy': ['milk', 'butter', 'cheese', 'mozzarella', 'cream', 'cottage']
-}
-
-# Function to expand query using synonyms
 def expand_query(query):
-    expanded_terms = []
-    for word in query.lower().split():
-        expanded_terms.append(word) 
-        
-        if word in synonyms_dict:
-            expanded_terms.extend(synonyms_dict[word])
+    query_vec = vectorizer.transform([query])
+    initial_sim = cosine_similarity(query_vec, tfidf_matrix).flatten()
     
-    return " ".join(expanded_terms)
+    top_10_idx = initial_sim.argsort()[-10:][::-1]
+    
+    # Extract concepts from the top 3 similar documents
+    local_concepts = []
+    for idx in top_10_idx:
+        if initial_sim[idx] > 0: 
+            ingredients_text = str(df['Cleaned Ingredients'].iloc[idx])
+            local_concepts.extend(ingredients_text.split())
+
+    # Count the frequency of each concept       
+    concept_counts = Counter(local_concepts)
+    
+    # Exclude words already in the original query and select the top 5 new concepts
+    existing_words = set(query.split())
+    new_concepts = [w for w, count in concept_counts.most_common() if w not in existing_words]
+    top_5_concepts = new_concepts[:5]
+    
+    if top_5_concepts:
+        expanded_q = query + " " + " ".join(top_5_concepts)
+        return expanded_q
+    else:
+        return query
 
 N=15
 #Search Function
@@ -105,7 +96,7 @@ def search_recipes(original_query, top_n=N):
     if expanded_q != original_query.lower():
         print(f"\n   [Query Expansion] : '{expanded_q}'")
 
-    query_vec = vectorizer.transform([expanded_q])
+    query_vec = vectorizer.transform([expanded_q]) #expanded_q,original_query
     similarity_scores = cosine_similarity(query_vec, tfidf_matrix).flatten()
     top_indices = similarity_scores.argsort()[-top_n:][::-1]
     
@@ -166,13 +157,28 @@ while True:
     if clean_query != user_query.lower():
         print(f"   Clean query : '{clean_query}'")
 
+    # Display initial search results before expansion
+    print("\n   🔍 [Initial Search Results] :")
+    init_query_vec = vectorizer.transform([clean_query])
+    init_sim = cosine_similarity(init_query_vec, tfidf_matrix).flatten()
+    top_10_init = init_sim.argsort()[-10:][::-1]
+    
+    found_init = False
+    for i, idx in enumerate(top_10_init):
+        if init_sim[idx] > 0:
+            found_init = True
+            print(f"      {i+1}. {df.iloc[idx]['Recipe Title']} (Score: {init_sim[idx]:.4f})")
+    if not found_init:
+        print("      - No initial results found -")
+
     print("\n" + "-"*60)
+
     print(f" Inverted Index : '{clean_query}'")
     print("-" * 60)
     print(f"{'Term':<15} | {'DF':<5} | {'Postings List '}")
     print("-" * 60)
     # Display DF and Postings List for each term in the query
-    query_terms = clean_query.split()
+    query_terms = expand_query(clean_query).split()
     for term in query_terms:
         if term in inverted_index:
             df_count = inverted_index[term]['DF']
@@ -188,20 +194,20 @@ while True:
     # Perform search and evaluate results
     search_results = search_recipes(clean_query, top_n=N)
     if search_results:
-        print(f"\n  find {len(search_results)} Menu that matches '{user_query}' ")
+        print(f"\n  find {len(search_results)} Menu that matches query")
         for i, result in enumerate(search_results):
             print(f"[{i+1}] {result['Title']}")
             print(f"     Similarity: {result['Score']:.4f} | Category: Cluster {result['Cluster']} | URL: {result['URL']}")
 
-        expanded_eval_query = expand_query(clean_query)
+        expanded_eval_query = expand_query(clean_query) 
         eval_pattern = r'\b(?:' + '|'.join(expanded_eval_query.split()) + r')\b'
 
         relevant_docs = df[
             df['Cleaned Title'].str.contains(eval_pattern, case=False, na=False) | 
             df['Cleaned Ingredients'].str.contains(eval_pattern, case=False, na=False)
         ].index.tolist()
-            
-        retrieved_indices = [res['Index'] for res in search_results]
+        
+        retrieved_indices = [res['Index'] for res in search_results] 
         retrieved_k = retrieved_indices[:N] 
         relevant_set = set(relevant_docs)   
         
