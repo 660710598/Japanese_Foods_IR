@@ -5,7 +5,7 @@ import time
 from bs4 import BeautifulSoup
 
 
-input_filename = 'Japan_Food_Links_50.csv' 
+input_filename = 'Japan_Food_Links_100.csv' 
 output_filename = 'Japan_Food_Ingredients_Full.csv'
 
 full_recipe_data = [["Recipe Title", "Recipe URL", "Ingredients"]]
@@ -43,17 +43,14 @@ for index, row in enumerate(recipes_to_scrape):
         soup = BeautifulSoup(res.text, 'html.parser')
         
         ingredients_list = []
-        # ค้นหาแท็กที่มีคลาสชื่อที่เกี่ยวข้องกับส่วนผสม (ingredient) โดยใช้ regex เพื่อความยืดหยุ่น
         ingredient_tags = soup.find_all(class_=re.compile(r'ingredient', re.IGNORECASE))
         
         for tag in ingredient_tags:
-            # ดึงข้อความจากแท็ก และทำความสะอาดข้อมูลด้วย regex เพื่อเอาเฉพาะตัวอักษรและตัวเลข (รวมถึงเครื่องหมายที่จำเป็น)
             text = tag.get_text(separator=' ', strip=True)
             
             if text and len(text) > 1 and text not in ingredients_list:
                 ingredients_list.append(text)
                 
-        # นำส่วนผสมทั้งหมดมาต่อกันเป็นข้อความเดียว คั่นด้วยช่องว่าง เพื่อให้ง่ายต่อการทำ IR Tokenize
         ingredients_text = " ".join(ingredients_list)
         
         if not ingredients_text:

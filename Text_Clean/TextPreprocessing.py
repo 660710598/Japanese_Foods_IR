@@ -18,8 +18,8 @@ except FileNotFoundError:
     print(f"{input_filename} not found.")
     exit()
 
-lemmatizer = WordNetLemmatizer()
-stopwords = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer() 
+stopwords = set(stopwords.words('english')) 
 
 custom_culinary_stopwords = {
     'cup', 'cups', 'teaspoon', 'teaspoons', 'tsp', 'tablespoon', 'tablespoons', 'tbsp', 'tbs', 'tb',
@@ -50,7 +50,6 @@ def clean_title(text):
     
     cleaned_tokens = []
     for token in tokens:
-        # ตัด stopwords พื้นฐาน และแปลงพหูพจน์เป็นเอกพจน์ (lemmatization)
         if token not in stopwords and len(token) > 1:
             lemma = lemmatizer.lemmatize(token)
             cleaned_tokens.append(lemma)
@@ -64,15 +63,12 @@ def clean_ingredients(text):
     cleaned_tokens = []
     for token in tokens:
         if token not in all_stopwords and len(token) > 1:
-            # Lemmatization เพื่อให้คำที่มีรูปแบบต่างๆ กลับมาเป็นรูปแบบพื้นฐาน เช่น "chopped" -> "chop"
             lemma = lemmatizer.lemmatize(token)
             cleaned_tokens.append(lemma)
     return ' '.join(cleaned_tokens)
 
-# ใช้ฟังก์ชัน clean_title กับคอลัมน์ 'Recipe Title' เพื่อสร้างคอลัมน์ใหม่ 'Cleaned Title'
+# ทำความสะอาดข้อมูลในคอลัมน์ 'Recipe Title' และ 'Ingredients' โดยใช้ฟังก์ชันที่กำหนดไว้
 df['Cleaned Title'] = df['Recipe Title'].apply(clean_title)
-
-# ใช้ฟังก์ชัน clean_ingredients กับคอลัมน์ 'Ingredients' เพื่อสร้างคอลัมน์ใหม่ 'Cleaned Ingredients'
 df['Cleaned Ingredients'] = df['Ingredients'].apply(clean_ingredients)
 
 df.to_csv(output_filename, index=False, encoding='utf-8-sig')

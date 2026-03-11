@@ -49,7 +49,7 @@ while count < amount:
     page += 1
 
 # 2. บันทึกข้อมูลลง CSV
-filename = 'Japan_Food_Links_50.csv'
+filename = 'Japan_Food_Links_100.csv'
 with open(filename, 'w', newline='', encoding='utf-8-sig') as f:
     writer = csv.writer(f)
     writer.writerows(recipe_data)
