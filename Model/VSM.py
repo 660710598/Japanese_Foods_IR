@@ -65,26 +65,39 @@ for col_idx, term in enumerate(feature_names):
 def expand_query(query):
     query_vec = vectorizer.transform([query])
     initial_sim = cosine_similarity(query_vec, tfidf_matrix).flatten()
-    
     top_10_idx = initial_sim.argsort()[-10:][::-1]
     
-    # Extract concepts from the top 3 similar documents
     local_concepts = []
     for idx in top_10_idx:
         if initial_sim[idx] > 0: 
+            #ดึงคำจาก 'Cleaned Ingredients' ของเอกสารที่มีความคล้ายคลึงสูง
             ingredients_text = str(df['Cleaned Ingredients'].iloc[idx])
             local_concepts.extend(ingredients_text.split())
 
     # Count the frequency of each concept       
     concept_counts = Counter(local_concepts)
     
-    # Exclude words already in the original query and select the top 5 new concepts
-    existing_words = set(query.split())
-    new_concepts = [w for w, count in concept_counts.most_common() if w not in existing_words]
-    top_5_concepts = new_concepts[:5]
+    if not concept_counts:
+        return query
+        
+    # หาความถี่สูงสุดของคำที่ดึงมาได้ (Max Frequency)
+    max_freq = concept_counts.most_common(1)[0][1]
     
-    if top_5_concepts:
-        expanded_q = query + " " + " ".join(top_5_concepts)
+    # 80% ของความถี่สูงสุดเป็นเกณฑ์ Dynamic Threshold
+    MIN_FREQ = max(2, int(max_freq * 0.8))
+
+    # คำไม่ซ้ำกับคำใน query 
+    existing_words = set(query.split())
+
+    # คัดเฉพาะคำที่ไม่ซ้ำ และความถี่ต้องผ่านเกณฑ์ Dynamic Threshold (รวมถึงต้องยาวกว่า 1 ตัวอักษร)
+    dynamic_concepts = [w for w, count in concept_counts.most_common() 
+                        if w not in existing_words and count >= MIN_FREQ and len(w) > 1]
+    
+    MAX_WORDS = 5
+    final_concepts = dynamic_concepts[:MAX_WORDS]
+    
+    if final_concepts:
+        expanded_q = query + " " + " ".join(final_concepts)
         return expanded_q
     else:
         return query
